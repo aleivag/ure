@@ -1,4 +1,4 @@
-from epiparsing import regex, Base, Wrap, ResultNotFoundError
+from ure import regex, Base, Wrap, ResultNotFoundError
 
 ### some extra modifiers
 

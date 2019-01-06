@@ -17,15 +17,27 @@ def regex(expr: str, flags: int = 0) -> Pattern:
 
 
 class Result:
-    def __init__(self, result: List[Any], names: Dict[str, Any] = None):
+    def __init__(
+        self,
+        result: List[Any],
+        names: Dict[str, Any] = None,
+        start: int = None,
+        end: int = None,
+    ):
         self.result = result
         self.names = names or {}
+        self.start, self.end = start, end
 
     def __repr__(self) -> str:
-        return f"<Result {self.result} {self.names}>"
+        return f"<Result {self.result} {self.names} ({self.start}, {self.end})>"
 
     def __eq__(self, result_b):
-        return (result_b.result, self.names) == (self.result, result_b.names)
+        return (result_b.result, result_b.names, result_b.start, result_b.end) == (
+            self.result,
+            self.names,
+            self.start,
+            self.end,
+        )
 
 
 class ResultNotFoundError(Exception):
@@ -70,15 +82,15 @@ class Base:
         """Match a single expr"""
         result = e.match(base, start)
         if result:
-            return result.group(), result.end()
+            return result, result.end()
         raise ResultNotFoundError()
 
     def parse_ws(self, base: str, start: int) -> Tuple[str, int]:
-        return self._parse_any(base, start, self.ws)
+        return None, self._parse_any(base, start, self.ws)[1]
 
     def parse_expr(self, base: str, start: int) -> Tuple[Result, int]:
         expr, end = self._parse_any(base, start, self.expr)
-        return Result(expr), end
+        return Result(expr.group(), names=expr.groupdict(), start=start, end=end), end
 
     def inner_parse(self, base: str, start: int = 0) -> Tuple[Result, int]:
         _, start = self.parse_ws(base, start)
@@ -114,11 +126,12 @@ class MatchAll(Composed):
         self.exprs = exprs
 
     def parse_expr(self, base: str, start: int):
-        result = Result([])
+        result = Result([], start=start)
         for e in self.exprs:
             r, start = e.inner_parse(base, start)
             if r:
                 result.result.append(r.result)
+        result.end = start
         return result, start
 
 
@@ -140,7 +153,7 @@ class MatchNtoM(Base):
         self.m = m
 
     def parse_expr(self, base: str, start: int):
-        result = Result([])
+        result = Result([], start=start)
         for _ in range(self.n):
             r, start = self.expr.inner_parse(base, start)
 
@@ -154,6 +167,7 @@ class MatchNtoM(Base):
                 break
             result.result.append(r.result)
             i += 1
+        result.end = start
         return result, start
 
 
