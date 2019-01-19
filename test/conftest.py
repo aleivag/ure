@@ -1,5 +1,5 @@
 import pytest
-from epiparsing import Result
+from ure import Result
 
 
 @pytest.fixture

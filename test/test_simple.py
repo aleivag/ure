@@ -1,12 +1,14 @@
 import pytest
 
-from epiparsing import Base, regex, ResultNotFoundError, Result
+from ure import Base, regex, ResultNotFoundError, Result
 
 RSTRING = "WHAEVS"
 
 
 def test_simple_cases():
-    assert Base(regex(RSTRING)).parse(RSTRING) == Result(RSTRING)
+    assert Base(regex(RSTRING)).parse(RSTRING) == Result(
+        RSTRING, start=0, end=len(RSTRING)
+    )
 
 
 def test_fail_to_parse_cases():
