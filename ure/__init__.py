@@ -2,7 +2,16 @@ import re
 
 from contextlib import suppress
 
-from typing import Pattern, Dict, Tuple, List, Any, Optional, Callable, Union
+from typing import (
+    Pattern,
+    Dict,
+    Tuple,
+    List,
+    Any,
+    Optional as TOptional,
+    Callable,
+    Union,
+)
 
 
 MEM_REGEX: Dict[int, Pattern] = {}
@@ -29,7 +38,7 @@ class Result:
         self.start, self.end = start, end
 
     def __repr__(self) -> str:
-        return f"<Result {self.result} {self.names} ({self.start}, {self.end})>"
+        return f"<Result {self.result} {self.names} [{self.start}, {self.end}) >"
 
     def __eq__(self, result_b):
         return (result_b.result, result_b.names, result_b.start, result_b.end) == (
@@ -49,7 +58,7 @@ class Base:
         self,
         expr: Union[str, Pattern],
         ws: Pattern = regex(r"\s*"),
-        modifiers: Optional[
+        modifiers: TOptional[
             List[Callable[[str, int, Result, int], Tuple[Result, int]]]
         ] = None,
     ) -> None:
@@ -86,7 +95,10 @@ class Base:
         raise ResultNotFoundError()
 
     def parse_ws(self, base: str, start: int) -> Tuple[str, int]:
-        return None, self._parse_any(base, start, self.ws)[1]
+        ws = self.ws
+        if ws:
+            return None, self._parse_any(base, start, ws)[1]
+        return None, start
 
     def parse_expr(self, base: str, start: int) -> Tuple[Result, int]:
         expr, end = self._parse_any(base, start, self.expr)
@@ -102,8 +114,18 @@ class Base:
 
 
 class Wrap(Base):
-    def __init__(self, wrapped):
+    def __init__(
+        self,
+        wrapped: Base,
+        modifiers: TOptional[
+            List[Callable[[str, int, Result, int], Tuple[Result, int]]]
+        ] = None,
+    ):
         self.wrapped = wrapped
+        self._modifiers = modifiers or []
+
+    def __repr__(self):
+        return f"Wrap(...)"
 
     def inner_parse(self, base: str, start: int = 0) -> Tuple[Result, int]:
         expr, end = self.wrapped.inner_parse(base, start)
@@ -122,22 +144,46 @@ class Composed(Base):
 
 
 class MatchAll(Composed):
-    def __init__(self, exprs: List[Base]) -> None:
+    def __init__(
+        self,
+        exprs: List[Base],
+        modifiers: TOptional[
+            List[Callable[[str, int, Result, int], Tuple[Result, int]]]
+        ] = None,
+    ) -> None:
         self.exprs = exprs
+        self._modifiers = modifiers or []
+
+    def __repr__(self):
+        return " & ".join(f"{e}" for e in self.exprs)
 
     def parse_expr(self, base: str, start: int):
         result = Result([], start=start)
         for e in self.exprs:
             r, start = e.inner_parse(base, start)
-            if r:
+            if isinstance(r, Result):
                 result.result.append(r.result)
+                result.names.update(r.names)
+            elif r:
+                result.result.append(r)
+
         result.end = start
         return result, start
 
 
 class MatchFirst(Base):
-    def __init__(self, exprs: List[Base]) -> None:
+    def __init__(
+        self,
+        exprs: List[Base],
+        modifiers: TOptional[
+            List[Callable[[str, int, Result, int], Tuple[Result, int]]]
+        ] = None,
+    ) -> None:
         self.exprs = exprs
+        self._modifiers = modifiers or []
+
+    def __repr__(self):
+        return " | ".join(f"{e}" for e in self.exprs)
 
     def parse_expr(self, base: str, start: int):
         for e in self.exprs:
@@ -147,10 +193,19 @@ class MatchFirst(Base):
 
 
 class MatchNtoM(Base):
-    def __init__(self, expr: Base, n: int = 0, m=None) -> None:
+    def __init__(
+        self,
+        expr: Base,
+        n: int = 0,
+        m=None,
+        modifiers: TOptional[
+            List[Callable[[str, int, Result, int], Tuple[Result, int]]]
+        ] = None,
+    ) -> None:
         self.expr = expr
         self.n = n
         self.m = m
+        self._modifiers = modifiers or []
 
     def parse_expr(self, base: str, start: int):
         result = Result([], start=start)
@@ -181,9 +236,12 @@ class Optional(MatchNtoM):
     def __init__(self, wrapped: Base, empty_on_no_result: bool = False):
         super().__init__(wrapped, 0, 1)
         if not empty_on_no_result:
-            self.modifiers.append(
-                lambda base, start, result, end: (
-                    result if result.result else None,
-                    end,
-                )
-            )
+            self.modifiers.append(self.optionalify)
+
+    def optionalify(self, base, start, result, end):
+        if result.result:
+            result.result = result.result[0]
+        else:
+            result = None
+
+        return result, end
