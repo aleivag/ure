@@ -54,12 +54,26 @@ class Namefy(Wrap):
         self.name = name
         self.modifiers.append(self._namefy)
 
-    def _namefy(self, base, start, result, end):
+    def _namefy(self, base, start, result, end) -> Tuple[Result, int]:
         result.names[self.name] = result.result
         return result, end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"@{self.name}:{self.wrapped}"
+
+
+class ParseAction(object):
+    def __init__(self, name, parser, fnc):
+        self.parser = parser
+        self.name = name
+        self.fnc = fnc
+
+    @property
+    def expr(self):
+        return self.parser.compile(self.name)
+
+    def parse(self, string, match_all=True):
+        return self.expr.parse(string, match_all=match_all)
 
 
 class Parser:
@@ -105,23 +119,35 @@ class Parser:
 
         return Base(reg), end
 
+    def _namefy(
+        self, base: str, start: int, result: Result, end: int
+    ) -> Tuple[Any, int]:
+        return Namefy(result.result[0][1:], result.result[2]), end
+
+    def _inner_algebra(
+        self, base: str, start: int, result: Result, end: int
+    ) -> Tuple[Any, int]:
+        a, o, b = result.result
+
+        return o([a, b]), end
+
+    def _parentesis(
+        self, base: str, start: int, result: Result, end: int
+    ) -> Tuple[Any, int]:
+        return result.result[1], end
+
     @property
-    def pegparser(self):
+    @functools.lru_cache()
+    def pegparser(self) -> Base:
         # lets grow this
         parser = Wrap(None)
+        algebra = Wrap(None)
+        namefy = Wrap(None)
 
-        # ob = Base(r"\(")
-        # cb = Base(r"\)")
+        op_or = Base(r"\|", modifiers=[self.get_or])
+        op_and = Base(r"\&", modifiers=[self.get_and])
 
-        op_or = Base(r"\|", modifiers=[lambda b, s, r, e: (MatchFirst, e)])
-        op_and = Base(r"\&", modifiers=[lambda b, s, r, e: (MatchAll, e)])
-
-        right_on = Base(
-            r"[\*\+\!\?]*",
-            # modifiers=[lambda b, s, result, end: (result if result.result else None, end)],
-        )
-
-        name_symbol = Base(":")
+        right_on = Base(r"[\*\+\!\?]*")
 
         infix_operand = MatchFirst([op_or, op_and])
 
@@ -130,18 +156,16 @@ class Parser:
             modifiers=[self.get_literal],
         )
 
-        name_identifier = Base(r"@\w+")
+        token = Base("\w+", modifiers=[lambda b, s, r, e: (self.compile(r.result), e)])
 
-        algebra = Wrap(None)
-        namefy = Wrap(None)
+        tokey = MatchFirst([literal, token])
 
-        global_expr = MatchAll([self.OPEN_PARENTHESIS, algebra, self.CLOSE_PARENTHESIS])
+        global_expr = MatchAll(
+            [self.OPEN_PARENTHESIS, algebra, self.CLOSE_PARENTHESIS],
+            modifiers=[self._parentesis],
+        )
 
-        @global_expr.modifiers.append
-        def parentesis(base, start, result, end):
-            return result.result[1], end
-
-        primary = MatchAll([MatchFirst([literal, global_expr]), right_on])
+        primary = MatchAll([MatchFirst([tokey, global_expr]), right_on])
 
         @primary.modifiers.append
         def say_what(base, start, result, end):
@@ -159,31 +183,21 @@ class Parser:
 
             return r, end
 
-        inner_name = MatchAll([name_identifier, name_symbol, primary])
-
-        @inner_name.modifiers.append
-        def inner_namefy(base, stat, result, end):
-            return Namefy(result.result[0][1:], result.result[2]), end
+        inner_name = MatchAll(
+            [self.NAME, self.OPERATOR_NAME, primary], modifiers=[self._namefy]
+        )
 
         namefy.wrapped = MatchFirst([inner_name, primary])
 
-        # @namefy.wrapped.modifiers.append
-        # def _namefy(base, start, result, end):
-        #     return result, end
-
-        inner_algebra = MatchAll([namefy, infix_operand, algebra])
-
-        @inner_algebra.modifiers.append
-        def inner_algebra_mod(base, start, result, end):
-            a, o, b = result.result
-
-            return o([a, b]), end
+        inner_algebra = MatchAll(
+            [namefy, infix_operand, algebra], modifiers=[self._inner_algebra]
+        )
 
         algebra.wrapped = MatchFirst([inner_algebra, namefy])
 
         return algebra
 
-    def compile(self, token):
+    def compile(self, token: str) -> Base:
         tok = self.tokens.get(token)
 
         if isinstance(tok, FutureToken):
@@ -204,8 +218,25 @@ class Parser:
         else:
             k, v = expr, None
 
-        # lets assume that k can only be a string for a moment
-
+        self.tokens[token] = FutureToken()
         parsed_expr = self.pegparser.parse(k.strip())
 
-        return parsed_expr
+        if v:
+            parsed_expr.modifiers.append(v)
+
+        if isinstance(self.tokens[token], FutureToken):
+            self.tokens[token] = parsed_expr
+        else:
+            self.tokens[token].wrapped = parsed_expr
+
+        return self.tokens[token]
+
+    def peg(self, peg_expr, name=None):
+        def binder(fnc):
+            _name = name if name else fnc.__name__
+
+            self.expr.update({_name: (peg_expr, fnc)})
+
+            return ParseAction(_name, self, fnc)
+
+        return binder
