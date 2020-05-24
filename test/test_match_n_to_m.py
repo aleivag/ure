@@ -1,5 +1,6 @@
 import pytest
-from ure import MatchNtoM, Base, regex, Result, ResultNotFoundError
+
+from ure import Base, MatchNtoM, Result, ResultNotFoundError, regex
 
 LONG_TEXT = "long text that should match all"
 LENTH_LONG_TEXT = len(LONG_TEXT.split())

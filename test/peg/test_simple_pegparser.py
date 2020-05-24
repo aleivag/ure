@@ -1,8 +1,9 @@
+import re
+
 import pytest
 
-import re
-from ure import Base, MatchFirst, MatchAll, Ignore, Optional, MatchNtoM, Result
-from ure.peg import Parser, reduce_infix, Namefy
+from ure import Base, Ignore, MatchAll, MatchFirst, MatchNtoM, Optional, Result
+from ure.peg import Namefy, Parser, reduce_infix
 
 
 @pytest.fixture()
@@ -15,7 +16,7 @@ def simple_parser():
 @pytest.mark.parametrize("modi,re_modi", [("", 0), ("i", re.I)])
 def test_literal(simple_parser, token, ob, cp, modi, re_modi):
     expr = f"{ob}{token}ure{token}{modi}{cp}"
-    lit = simple_parser.pegparser.parse(expr)
+    lit = simple_parser.pegparser.parse(expr).result
     assert isinstance(lit, Base)
     assert lit.expr == re.compile("ure", re_modi)
     assert lit.parse("ure") == Result("ure", start=0, end=3)
@@ -29,7 +30,7 @@ def test_infix(simple_parser, operator, token, ob, cp, nwords):
     base_word = "word"
     words = [f"{ob}  {token}{base_word}{n}{token}   {cp}" for n in range(nwords)]
     expr = operator.join(words)
-    lit = simple_parser.pegparser.parse(expr)
+    lit = simple_parser.pegparser.parse(expr).result
 
     e = lit.exprs[:]
     for _ in range(nwords - 2):
@@ -48,7 +49,7 @@ def test_infix(simple_parser, operator, token, ob, cp, nwords):
 @pytest.mark.parametrize("op,cp", [("(", ")"), ("", "")])
 def test_right(simple_parser, right, rightbase, ws, op, cp):
     expr = f" {op}'hey'{ws}{cp}{ws}{right} ".strip()
-    lit = simple_parser.pegparser.parse(expr)
+    lit = simple_parser.pegparser.parse(expr).result
     assert isinstance(lit, rightbase)
 
 
@@ -57,7 +58,7 @@ def test_right(simple_parser, right, rightbase, ws, op, cp):
 
 @pytest.mark.parametrize("cases", ["@name: 'hey'", "@name: ('hey')", "(@name: 'hey')"])
 def test_names(simple_parser, cases):
-    lit = simple_parser.pegparser.parse(cases.strip())
+    lit = simple_parser.pegparser.parse(cases.strip()).result
     assert isinstance(lit, Namefy)
     assert lit.parse("hey").names["name"] == "hey"
 
@@ -66,7 +67,7 @@ def test_names(simple_parser, cases):
     "cases", ["@name: 'hey'*", "@name: ('hey')*", "@name: 'hey'+", "@name: ('hey')+"]
 )
 def test_names_with_right(simple_parser, cases):
-    lit = simple_parser.pegparser.parse(cases.strip())
+    lit = simple_parser.pegparser.parse(cases.strip()).result
     assert isinstance(lit, Namefy)
     assert lit.parse("hey") == Result(["hey"], names={"name": ["hey"]}, start=0, end=3)
 
@@ -77,7 +78,9 @@ def test_names_with_right(simple_parser, cases):
 
 @pytest.mark.parametrize("expr", ["a", "bc", "de"])
 def test_parenthesis(simple_parser, expr):
-    e = simple_parser.pegparser.parse(" 'a' | ('b' & 'c') | ('d' & 'e') ".strip())
+    e = simple_parser.pegparser.parse(
+        " 'a' | ('b' & 'c') | ('d' & 'e') ".strip()
+    ).result
 
     assert e.parse(expr) == Result(
         list(expr) if len(expr) > 1 else expr, start=0, end=len(expr)
@@ -87,12 +90,12 @@ def test_parenthesis(simple_parser, expr):
 @pytest.mark.parametrize("expr", ["a", "a" * 4])
 @pytest.mark.parametrize("rep", ["+", "*"])
 def test_repeat(simple_parser, expr, rep):
-    e = simple_parser.pegparser.parse(f"'a'{rep}")
+    e = simple_parser.pegparser.parse(f"'a'{rep}").result
     assert e.parse(expr) == Result(list(expr), start=0, end=len(expr))
 
 
 def test_name_repeat(simple_parser):
-    e = simple_parser.pegparser.parse(f"@name:'a'*")
+    e = simple_parser.pegparser.parse(f"@name:'a'*").result
     assert e.parse("aaaa") == Result(
         list("aaaa"), names={"name": list("aaaa")}, start=0, end=len("aaaa")
     )
@@ -101,7 +104,7 @@ def test_name_repeat(simple_parser):
 @pytest.mark.parametrize("expr", ["a", "bc"])
 def test_infix_combinations(simple_parser, expr):
     # TODO: Better define this
-    e = simple_parser.pegparser.parse(f"'a' | 'b' & 'c'")
+    e = simple_parser.pegparser.parse(f"'a' | 'b' & 'c'").result
     assert e.parse(expr) == Result(
         list(expr) if len(expr) > 1 else expr, start=0, end=len(expr)
     )
@@ -110,7 +113,7 @@ def test_infix_combinations(simple_parser, expr):
 @pytest.mark.parametrize("expr", ["a", "abc", "abcbc"])
 def test_infix_and_repetition(simple_parser, expr):
     # TODO: Better define this
-    e = simple_parser.pegparser.parse(f" 'a' & @name:('b' & 'c')*")
+    e = simple_parser.pegparser.parse(f" 'a' & @name:('b' & 'c')*").result
     rep = [list("bc") for _ in range(0, len(expr) - 1, 2)]
     r = ["a", rep]
     assert e.parse(expr) == Result(r, names={"name": rep}, start=0, end=len(expr))
@@ -118,6 +121,8 @@ def test_infix_and_repetition(simple_parser, expr):
 
 def test_extra_cases(simple_parser):
     parser = simple_parser
-    r = parser.pegparser.parse(" 'us' & ('(?P<me>you)' )   ".strip()).parse("us you")
+    r = parser.pegparser.parse(" 'us' & ('(?P<me>you)' )   ".strip()).result.parse(
+        "us you"
+    )
 
     assert r == Result(["us", "you"], names={"me": "you"}, start=0, end=6)

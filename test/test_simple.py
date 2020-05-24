@@ -1,6 +1,6 @@
 import pytest
 
-from ure import Base, regex, ResultNotFoundError, Result
+from ure import Base, Result, ResultNotFoundError, regex
 
 RSTRING = "WHAEVS"
 

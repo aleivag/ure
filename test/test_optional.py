@@ -1,4 +1,4 @@
-from ure import Optional, Base, Result, MatchAll
+from ure import Base, MatchAll, Optional, Result
 
 
 def test():

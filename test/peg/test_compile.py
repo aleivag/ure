@@ -1,4 +1,4 @@
-from ure import Result
+from ure import Base, Result
 from ure.peg import Parser
 
 SIMPLE_KEY = "simple"
@@ -41,6 +41,17 @@ def test_simple_peg_decorator():
     @parser.peg("'hey'")
     def mult2(base, start, result, end):
         result.result = result.result * 2
-        return result, end
+        return result
 
     assert mult2.parse("hey") == Result("hey" * 2, start=0, end=3)
+
+
+def test_accept_base():
+    parser = Parser()
+    NAME = "RANDOM_EXPR"
+    parser.expr[NAME] = Base("hello")
+    print(parser.compile(NAME))
+
+    assert parser.compile(NAME).parse("hello") == Result(
+        "hello", start=0, end=len("hello")
+    )

@@ -1,6 +1,6 @@
-from ure.peg import Parser
-
 import pytest
+
+from ure.peg import Parser
 
 
 @pytest.fixture

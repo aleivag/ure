@@ -1,5 +1,6 @@
 import pytest
-from ure import MatchFirst, Base, regex, Result
+
+from ure import Base, MatchFirst, Result, regex
 
 
 @pytest.mark.parametrize("val", ["____", "12345", "alvaro"])

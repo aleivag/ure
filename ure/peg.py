@@ -1,17 +1,19 @@
+import functools
 import re
 from typing import Any, Tuple
+
 from ure import (
     Base,
+    Ignore,
+    MatchAll,
+    MatchFirst,
+    MatchNtoM,
+    Optional,
+    Result,
     Wrap,
     regex,
-    Result,
-    MatchNtoM,
-    MatchFirst,
-    MatchAll,
-    Optional,
-    Ignore,
 )
-import functools
+from ure.extra import Integer, Number
 
 TOKEN = Base(r"[a-zA-z_][\w_]*")
 LITERAL = Base(r"([\"\'/])(?P<content>.*?(?<!\\)(\\\\)*)\1(?P<mods>[ilmsux]*)")
@@ -29,7 +31,7 @@ def convert_to_base(base, start, result, end):
         else 0,
     )
 
-    return Result(Base(reg)), end
+    return Result(Base(reg))
 
 
 class FutureToken:
@@ -55,8 +57,9 @@ class Namefy(Wrap):
         self.modifiers.append(self._namefy)
 
     def _namefy(self, base, start, result, end) -> Tuple[Result, int]:
-        result.names[self.name] = result.result
-        return result, end
+        if result:
+            result.names[self.name] = result.result
+        return result
 
     def __repr__(self) -> str:
         return f"@{self.name}:{self.wrapped}"
@@ -84,11 +87,13 @@ class Parser:
     OPERATOR_OR = Base(r"\|")
     OPERATOR_NAME = Base(":")
 
-    NAME = Base("@[a-zA-Z_]\w+")
+    NAME = Base(r"@[a-zA-Z_]\w+")
+    FUNC = Base(r"$[a-zA-Z_]\w+")
 
-    def __init__(self):
-        self.expr = {}
+    def __init__(self) -> None:
+        self.expr = {"integer": Integer, "number": Number}
         self.tokens = {}
+        self.funcs = {}
 
         # lets define the parser
         self.literal = Base(
@@ -97,10 +102,10 @@ class Parser:
         )
 
     def get_or(self, base: str, start: int, result: Any, end: int) -> Tuple[Any, int]:
-        return MatchFirst, end
+        return MatchFirst
 
     def get_and(self, base: str, start: int, result: Any, end: int) -> Tuple[Any, int]:
-        return MatchAll, end
+        return MatchAll
 
     def get_literal(
         self, base: str, start: int, result: Any, end: int
@@ -117,24 +122,24 @@ class Parser:
             else 0,
         )
 
-        return Base(reg), end
+        return Base(reg)
 
     def _namefy(
         self, base: str, start: int, result: Result, end: int
     ) -> Tuple[Any, int]:
-        return Namefy(result.result[0][1:], result.result[2]), end
+        return Namefy(result.result[0][1:], result.result[2])
 
     def _inner_algebra(
         self, base: str, start: int, result: Result, end: int
     ) -> Tuple[Any, int]:
         a, o, b = result.result
 
-        return o([a, b]), end
+        return o([a, b])
 
     def _parentesis(
         self, base: str, start: int, result: Result, end: int
     ) -> Tuple[Any, int]:
-        return result.result[1], end
+        return result.result[1]
 
     @property
     @functools.lru_cache()
@@ -156,7 +161,7 @@ class Parser:
             modifiers=[self.get_literal],
         )
 
-        token = Base("\w+", modifiers=[lambda b, s, r, e: (self.compile(r.result), e)])
+        token = Base(r"\w+", modifiers=[lambda b, s, r, e: self.compile(r.result)])
 
         tokey = MatchFirst([literal, token])
 
@@ -181,7 +186,7 @@ class Parser:
                 elif mod == "!":
                     r = Ignore(r)
 
-            return r, end
+            return r
 
         inner_name = MatchAll(
             [self.NAME, self.OPERATOR_NAME, primary], modifiers=[self._namefy]
@@ -218,22 +223,30 @@ class Parser:
         else:
             k, v = expr, None
 
+        if isinstance(k, Base):
+            # someone give us a expression already, lets return that
+            self.tokens[token] = k
+            return self.tokens[token]
+
         self.tokens[token] = FutureToken()
-        parsed_expr = self.pegparser.parse(k.strip())
+        parsed_expr = self.pegparser.parse(k.strip()).result
 
         if v:
             parsed_expr.modifiers.append(v)
 
         if isinstance(self.tokens[token], FutureToken):
             self.tokens[token] = parsed_expr
+
         else:
             self.tokens[token].wrapped = parsed_expr
 
         return self.tokens[token]
 
-    def peg(self, peg_expr, name=None):
+    def peg(self, peg_expr, name=None, decorator=None):
         def binder(fnc):
             _name = name if name else fnc.__name__
+            if decorator:
+                fnc = decorator(fnc)
 
             self.expr.update({_name: (peg_expr, fnc)})
 

@@ -1,6 +1,7 @@
 import pytest
-from ure.extra import Between
+
 from ure import Result, ResultNotFoundError
+from ure.extra import Between
 
 OCTET = Between(0, 255)
 MIN_ONE = Between(-1, 1)

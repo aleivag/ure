@@ -1,24 +1,30 @@
-from ure import regex, Base, Wrap, ResultNotFoundError
+from ure import Base, MatchAll, MatchNtoM, ResultNotFoundError, Wrap, regex, by_result
 
 ### some extra modifiers
 
 
 def nullify(base, start, result, end):
-    return None, end
+    return None
 
 
-def cast_to_int(base, start, result, end):
-    result.result = int(result.result)
-    return result, end
+@by_result()
+def cast_to_int(result):
+    return int(result.result)
 
 
-Integer = Base(regex("[\+-]?\d+"), modifiers=[cast_to_int])
+@by_result()
+def cast_to_float(result):
+    return float(result.result)
+
+
+Integer = Base(regex(r"[\+-]?\d+"), modifiers=[cast_to_int])
+Number = Base(regex(r"[-+]?([0-9]*\.[0-9]+|[0-9]+)"), modifiers=[cast_to_float])
 
 
 class Between(Wrap):
     def _between(self, base, start, result, end):
         if self.lower <= result.result <= self.upper:
-            return result, end
+            return result
         raise ResultNotFoundError()
 
     def __init__(self, lower, upper):

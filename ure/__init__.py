@@ -1,18 +1,11 @@
+import ast
+import inspect
 import re
-
 from contextlib import suppress
-
-from typing import (
-    Pattern,
-    Dict,
-    Tuple,
-    List,
-    Any,
-    Optional as TOptional,
-    Callable,
-    Union,
-)
-
+from functools import wraps
+from typing import Any, Callable, Dict, List
+from typing import Optional as TOptional
+from typing import Pattern, Tuple, Union
 
 MEM_REGEX: Dict[int, Pattern] = {}
 
@@ -23,6 +16,12 @@ def regex(expr: str, flags: int = 0) -> Pattern:
         MEM_REGEX[h] = re.compile(expr, flags)
 
     return MEM_REGEX[h]
+
+
+class ResultTuple:
+    def __init__(self, result: Any, end: int):
+        self.result = result
+        self.end = end
 
 
 class Result:
@@ -109,7 +108,17 @@ class Base:
 
         expr, end = self.parse_expr(base, start)
         for modifier in self.modifiers:
-            expr, end = modifier(base, start, expr, end)
+            mod = modifier(base, start, expr, end)
+            if isinstance(mod, ResultTuple):
+                result, end = mod.result, mod.end
+            else:
+                result = mod
+
+            if not isinstance(result, (Result, type(None))):
+                expr.result = result
+            else:
+                expr = result
+
         return expr, end
 
 
@@ -130,7 +139,16 @@ class Wrap(Base):
     def inner_parse(self, base: str, start: int = 0) -> Tuple[Result, int]:
         expr, end = self.wrapped.inner_parse(base, start)
         for modifier in self.modifiers:
-            expr, end = modifier(base, start, expr, end)
+            mod = modifier(base, start, expr, end)
+            if isinstance(mod, ResultTuple):
+                result, end = mod.result, mod.end
+            else:
+                result = mod
+
+            if not isinstance(result, (Result, type(None))):
+                expr.result = result
+            else:
+                expr = result
         return expr, end
 
 
@@ -229,7 +247,7 @@ class MatchNtoM(Base):
 class Ignore(Wrap):
     def __init__(self, wrapped):
         super().__init__(wrapped)
-        self.modifiers.append(lambda base, start, result, end: (None, end))
+        self.modifiers.append(lambda base, start, result, end: None)
 
 
 class Optional(MatchNtoM):
@@ -244,4 +262,28 @@ class Optional(MatchNtoM):
         else:
             result = None
 
-        return result, end
+        return result
+
+
+def by_result(fnc=None):
+    if not fnc:
+        return by_result
+
+    @wraps(fnc)
+    def _(text, start, result, end):
+        return fnc(result)
+
+    return _
+
+
+def by_name(fnc=None):
+    if not fnc:
+        return by_name
+
+    expr_sig = inspect.signature(fnc).parameters
+
+    @wraps(fnc)
+    def _(text, start, result, end):
+        return fnc(**{k: result.names[k] for k in expr_sig if k in result.names})
+
+    return _

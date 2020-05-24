@@ -1,5 +1,6 @@
-from ure import Result
 import pytest
+
+from ure import Result
 
 
 def test_add(parser):

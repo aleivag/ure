@@ -1,4 +1,5 @@
 import pytest
+
 from ure import Result
 
 
