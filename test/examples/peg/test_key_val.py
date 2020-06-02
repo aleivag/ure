@@ -8,16 +8,12 @@ parser.expr.update(
         "key": r"/[\d\w]+/",
         "val": "hasht | key",
         "kv": ('key & "=>"! & val', lambda t, s, r, e: (r.result[0], r.result[1][0])),
+        "kvs": "$delimited_list[kv, ',']",
     }
 )
 
 
-@parser.peg(" @head:kv & @middle:(','! & kv)*", decorator=by_name)
-def kvs(head, middle):
-    return (head, *(f[0] for f in middle))
-
-
-@parser.peg(" '{'! & @kvs:kvs & '}'! ", decorator=by_name)
+@parser.peg(" '{' & @kvs:kvs & '}' ", decorator=by_name)
 def hasht(kvs):
     return dict(kvs)
 

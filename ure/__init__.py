@@ -73,6 +73,10 @@ class Base:
         self._ws = getattr(self, "_ws", regex(r"\s*"))
         return self._ws
 
+    @ws.setter
+    def ws(self, value) -> None:
+        self._ws = value
+
     @property
     def modifiers(self) -> List[Callable[[str, int, Result, int], Tuple[Result, int]]]:
         self._modifiers = getattr(self, "_modifiers", [])
@@ -285,5 +289,12 @@ def by_name(fnc=None):
     @wraps(fnc)
     def _(text, start, result, end):
         return fnc(**{k: result.names[k] for k in expr_sig if k in result.names})
+
+    return _
+
+
+def extract_name(name):
+    def _(text, start, result, end):
+        return result.names[name]
 
     return _

@@ -12,8 +12,9 @@ from ure import (
     Result,
     Wrap,
     regex,
+    by_result,
 )
-from ure.extra import Integer, Number
+from ure.extra import Integer, Number, IPv4, IPv6, IP, delimited_list
 
 TOKEN = Base(r"[a-zA-z_][\w_]*")
 LITERAL = Base(r"([\"\'/])(?P<content>.*?(?<!\\)(\\\\)*)\1(?P<mods>[ilmsux]*)")
@@ -88,12 +89,18 @@ class Parser:
     OPERATOR_NAME = Base(":")
 
     NAME = Base(r"@[a-zA-Z_]\w+")
-    FUNC = Base(r"$[a-zA-Z_]\w+")
+    FUNC = Base(r"\$[a-zA-Z_]\w+")
 
     def __init__(self) -> None:
-        self.expr = {"integer": Integer, "number": Number}
+        self.expr = {
+            "integer": Integer,
+            "number": Number,
+            "ipv4": IPv4,
+            "ipv6": IPv6,
+            "ip_address": IP,
+        }
         self.tokens = {}
-        self.funcs = {}
+        self.funcs = {"delimited_list": delimited_list}
 
         # lets define the parser
         self.literal = Base(
@@ -129,6 +136,11 @@ class Parser:
     ) -> Tuple[Any, int]:
         return Namefy(result.result[0][1:], result.result[2])
 
+    def _funcify(self, result: Result):
+        func_name = result.result[0][1:]
+        args = result.result[2] if isinstance(result.result[2], list) else []
+        return self.funcs[func_name](*args)
+
     def _inner_algebra(
         self, base: str, start: int, result: Result, end: int
     ) -> Tuple[Any, int]:
@@ -148,6 +160,7 @@ class Parser:
         parser = Wrap(None)
         algebra = Wrap(None)
         namefy = Wrap(None)
+        funcify = Wrap(None)
 
         op_or = Base(r"\|", modifiers=[self.get_or])
         op_and = Base(r"\&", modifiers=[self.get_and])
@@ -163,7 +176,13 @@ class Parser:
 
         token = Base(r"\w+", modifiers=[lambda b, s, r, e: self.compile(r.result)])
 
-        tokey = MatchFirst([literal, token])
+        tokey = MatchFirst([funcify, literal, token])
+
+        func_arg_list = Optional(delimited_list(tokey, Base(",")))
+        funcify.wrapped = MatchAll(
+            [self.FUNC, Base(r"\["), func_arg_list, Base(r"]"),],
+            modifiers=[by_result(self._funcify)],
+        )
 
         global_expr = MatchAll(
             [self.OPEN_PARENTHESIS, algebra, self.CLOSE_PARENTHESIS],
@@ -217,7 +236,6 @@ class Parser:
 
         # we dont know the token, lets get it from expr
         expr = self.expr[token]
-
         if isinstance(expr, (list, tuple)):
             k, v = expr
         else:
@@ -253,3 +271,15 @@ class Parser:
             return ParseAction(_name, self, fnc)
 
         return binder
+
+    def func(self, name=None):
+        def binder(fnc):
+            _name = name if name else fnc.__name__
+            self.funcs.update({_name: fnc})
+            return fnc
+
+        return binder
+
+    def inline(self, name, peg_expr, fnc=None):
+        self.expr[name] = (peg_expr, fnc)
+        return ParseAction(name, self, fnc)
