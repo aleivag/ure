@@ -9,6 +9,8 @@ from typing import Pattern, Tuple, Union
 
 MEM_REGEX: Dict[int, Pattern] = {}
 
+__VERSION__ = "0.1"
+
 
 def regex(expr: str, flags: int = 0) -> Pattern:
     h = hash((expr, flags))

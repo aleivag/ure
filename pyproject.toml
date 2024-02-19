@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ure"
+dynamic = ["version"]
+description = "universal regular expressions"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Alvaro Leiva", email = "aleivag@gmail.com" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.hatch.version]
+path = "ure/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/ure",
+]
+
+[tool.hatch.envs.test]
+# black tox pylint pytest rope blacken-docs isort
+dependencies = [
+    "pytest"
+]
+
+[tool.hatch.envs.test.scripts]
+test = [
+    "pytest test"
+]

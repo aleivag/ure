@@ -3,9 +3,7 @@
 
 `ure` is a library that allows you to extend regular expressions, so they can parse
 more complex expressions, the most common use is `ure.peg` that allow you to parse complex text
-by writing pseudo-PEG expressions. 
-
-![travis-status](https://api.travis-ci.org/aleivag/ure.svg?branch=master)
+by writing pseudo-PEG expressions.
 
 Example use:
 ------------
@@ -68,7 +66,7 @@ greet.parse("hello cruel world")  # have a extra word
 greet.parse("hello")  # missing "world"
 ```
 
-The *and* opetarator retuen an array with 2 element, the left element, and the right element. Multiple 
+The *and* operator return an array with 2 element, the left element, and the right element. Multiple 
 *ampersand* are evaluated left to right, so:
 
 
@@ -213,5 +211,5 @@ but `[` is _ignored_ by using the `!` operation, this means that what would norm
 
  The group tail is similar as head, but it also has a "zero or more" operation, allowing it to match any (or none) secuence of a comma (`,`) followed by a number. The comma is ommited from the output.
 
- The final "unamed group" its the trailing comma group, with the close bracket, "]". This whole group is then ignored, this is there mostly for demostrating purposes, but probably you dont need it since, you dont include that group in the modifier function.
+ The final "unamed group" it's the trailing comma group, with the close bracket, "]". This whole group is then ignored, this is there mostly for demostrating purposes, but probably you dont need it since, you dont include that group in the modifier function.
 

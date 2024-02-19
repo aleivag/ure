@@ -77,7 +77,8 @@ class ParseAction(object):
         return self.parser.compile(self.name)
 
     def parse(self, string, match_all=True):
-        return self.expr.parse(string, match_all=match_all)
+        expr = self.expr
+        return expr.parse(string, match_all=match_all)
 
 
 class Parser:
@@ -281,5 +282,6 @@ class Parser:
         return binder
 
     def inline(self, name, peg_expr, fnc=None):
+        assert name not in self.expr, f"name {name} already exists"
         self.expr[name] = (peg_expr, fnc)
         return ParseAction(name, self, fnc)
