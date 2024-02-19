@@ -67,7 +67,7 @@ class Namefy(Wrap):
 
 
 class ParseAction(object):
-    def __init__(self, name, parser, fnc):
+    def __init__(self, name:str, parser, fnc) -> None:
         self.parser = parser
         self.name = name
         self.fnc = fnc
@@ -76,9 +76,13 @@ class ParseAction(object):
     def expr(self):
         return self.parser.compile(self.name)
 
-    def parse(self, string, match_all=True):
+    def parse(self, string:str, match_all:bool=True):
         expr = self.expr
         return expr.parse(string, match_all=match_all)
+
+    def inner_parse(self, base: str, start: int = 0):
+        expr = self.expr
+        return expr.inner_parse(base, start)
 
 
 class Parser:
