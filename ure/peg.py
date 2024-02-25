@@ -76,7 +76,7 @@ class ParseAction(object):
     def expr(self):
         return self.parser.compile(self.name)
 
-    def parse(self, string:str, match_all:bool=True):
+    def parse(self, string: str, match_all: bool=True):
         expr = self.expr
         return expr.parse(string, match_all=match_all)
 
