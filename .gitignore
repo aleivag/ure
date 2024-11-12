@@ -1,0 +1,11 @@
+.tox
+.vscode
+.pytest_cache
+__pycache__
+__debug__
+venv
+.venv
+*.egg-info
+.DS_Store
+.idea
+dist

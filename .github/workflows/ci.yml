@@ -1,0 +1,27 @@
+name: Continuous Integration
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12']
+    runs-on: ubuntu-latest
+    steps:
+    -   name: Checkout repository
+        uses: actions/checkout@v2
+    
+    -   name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+            python-version: ${{ matrix.python }}
+  
+    -   name: Install Hatch
+        uses: pypa/hatch@install
+    
+    -   name: run tests
+        run: hatch run ci:test  
+    
