@@ -5,7 +5,7 @@ on:
         paths:
             - 'ure/__version__.py'
         branches:
-            - master
+            - main
 
 permissions:
   contents: write
