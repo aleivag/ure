@@ -8,45 +8,46 @@ on:
             - main
 
 permissions:
-  contents: write
-  deployments: write
+    contents: write
+    deployments: write
 
 jobs:
-  main:
-    name: Publish artifacts
-    runs-on: ubuntu-latest
-    environment:
-        name: pypi
-        url: https://pypi.org/p/ure
-    permissions:
-        id-token: write
+    main:
+        name: Publish artifacts
+        runs-on: ubuntu-latest
+        environment:
+            name: pypi
+            url: https://pypi.org/p/ure
+        permissions:
+            id-token: write
+            contents: write
+            deployments: write
+        steps:
+            -   uses: actions/checkout@v3
 
-    steps:
-        -   uses: actions/checkout@v3
+            -   name: Set up latest Python
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.10'
 
-        -   name: Set up latest Python
-            uses: actions/setup-python@v4
-            with:
-                python-version: '3.10'
-
-        -   name: Install Hatch
-            uses: pypa/hatch@install
-        
-    
-        -   name: build package
-            run: hatch build
-        
+            -   name: Install Hatch
+                uses: pypa/hatch@install
             
-        -   name: Create github tag
-            env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            run: |
-                VERSION=$(hatch run python -c 'from ure.__version__ import __version__;print(__version__)')
-                git config user.name github-actions
-                git config user.email github-actions@github.com
-                git tag -a "v$VERSION" -m "release new v$VERSION version"
-                git push origin --tags
         
-        -   name: Publish package distributions to PyPI
-            uses: pypa/gh-action-pypi-publish@release/v1
+            -   name: build package
+                run: hatch build
+            
+                
+            -   name: Create github tag
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    VERSION=$(hatch run python -c 'from ure.__version__ import __version__;print(__version__)')
+                    git config user.name github-actions
+                    git config user.email github-actions@github.com
+                    git tag -a "v$VERSION" -m "release new v$VERSION version"
+                    git push origin --tags
+            
+            -   name: Publish package distributions to PyPI
+                uses: pypa/gh-action-pypi-publish@release/v1
     
