@@ -25,10 +25,10 @@ jobs:
         steps:
             -   uses: actions/checkout@v3
 
-            -   name: Set up latest Python
-                uses: actions/setup-python@v4
-                with:
-                    python-version: '3.10'
+            # -   name: Set up latest Python
+            #     uses: actions/setup-python@v4
+            #     with:
+            #         python-version: '3.10'
 
             -   name: Install Hatch
                 uses: pypa/hatch@install
@@ -42,7 +42,7 @@ jobs:
                 env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                 run: |
-                    VERSION=$(hatch run python -c 'from ure.__version__ import __version__;print(__version__)')
+                    VERSION=$(hatch version)
                     git config user.name github-actions
                     git config user.email github-actions@github.com
                     git tag -a "v$VERSION" -m "release new v$VERSION version"
